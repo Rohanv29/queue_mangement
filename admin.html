@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel — QueueFlow</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="page-wrapper wide">
+
+  <!-- ── Header ── -->
+  <header class="site-header">
+    <div class="logo">⚙️</div>
+    <div>
+      <h1>Admin Panel</h1>
+      <p>Queue Management Dashboard</p>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html">User Page</a>
+      <a href="display.html">Display</a>
+    </nav>
+  </header>
+
+  <!-- ── Alert ── -->
+  <div id="alert" class="alert" role="alert"></div>
+
+  <!-- ── Dashboard Grid ── -->
+  <div class="admin-dashboard">
+
+    <!-- ── LEFT SIDEBAR ── -->
+    <aside>
+
+      <!-- Now Serving Card -->
+      <div class="card">
+        <p class="card-title">Now Serving</p>
+        <div style="text-align:center; padding: 0.5rem 0;">
+          <div class="token-number" id="servingToken" style="font-size:3.5rem;">—</div>
+          <div id="servingName" style="font-size:1rem;color:var(--text-muted);margin-top:0.35rem;"></div>
+        </div>
+      </div>
+
+      <!-- Stats Card -->
+      <div class="card">
+        <p class="card-title">Queue Stats</p>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+          <div class="stat-box" style="padding:1rem;">
+            <div class="stat-value" id="statTotal">0</div>
+            <div class="stat-label">Waiting</div>
+          </div>
+          <div class="stat-box" style="padding:1rem;">
+            <div class="stat-value" id="statServed">0</div>
+            <div class="stat-label">Served</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls Card -->
+      <div class="card">
+        <p class="card-title">Controls</p>
+        <button class="btn btn-success" id="nextBtn" style="width:100%;margin-bottom:0.75rem;" onclick="handleNext()">
+          ▶ Serve Next
+        </button>
+        <p style="font-size:0.75rem;color:var(--text-muted);text-align:center;">
+          Removes first person and updates display
+        </p>
+      </div>
+
+      <!-- Reset Counter -->
+      <div class="card">
+        <p class="card-title">Danger Zone</p>
+        <button class="btn btn-danger" style="width:100%;padding:0.6rem;" onclick="confirmClear()">
+          🗑 Clear Entire Queue
+        </button>
+      </div>
+
+    </aside>
+
+    <!-- ── MAIN QUEUE LIST ── -->
+    <main>
+      <div class="card" style="padding:1.5rem;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem;">
+          <p class="card-title" style="margin:0;">Live Queue</p>
+          <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--text-muted);">
+            <span class="pulse-dot"></span> Real-time
+          </div>
+        </div>
+
+        <!-- Queue Table Header -->
+        <div style="display:grid;grid-template-columns:70px 1fr 100px 90px 80px;gap:0.5rem;
+          padding:0.5rem 1.1rem;font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;
+          color:var(--text-muted);border-bottom:1px solid var(--border);margin-bottom:0.5rem;">
+          <span>Token</span>
+          <span>Name</span>
+          <span>Joined</span>
+          <span>Wait</span>
+          <span style="text-align:right;">Action</span>
+        </div>
+
+        <!-- Queue Items Container -->
+        <div id="queueContainer">
+          <div class="loader">
+            <div class="loader-dots"><span></span><span></span><span></span></div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+  </div><!-- /admin-dashboard -->
+
+</div><!-- /page-wrapper -->
+
+<!-- ── Firebase SDKs ── -->
+
+<script type="module" src="script.js"></script>
+
+<script>
+// ── State ────────────────────────────────────────────────────
+let servedCount = 0;
+let currentQueue = [];
+
+// ── Render Queue List ─────────────────────────────────────────
+function renderQueue(queue) {
+  currentQueue = queue;
+  const container = document.getElementById("queueContainer");
+  document.getElementById("statTotal").textContent = queue.length;
+
+  if (queue.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">✅</div>
+        <p>Queue is empty. All done!</p>
+      </div>`;
+    return;
+  }
+
+  let html = '<ul class="queue-list">';
+  queue.forEach((item, index) => {
+    const isFirst = index === 0;
+    const waitMins = index * 3;
+    const waitLabel = index === 0 ? "Next up" : `~${waitMins} min`;
+
+    html += `
+      <li class="queue-item${isFirst ? " serving" : ""}" id="item-${item.id}">
+        <span class="queue-token">#${String(item.tokenNumber).padStart(3,"0")}</span>
+        <span class="queue-name">${escapeHtml(item.name)}</span>
+        <span class="queue-meta" style="min-width:80px;">${formatTime(item.timestamp)}</span>
+        <span class="queue-meta" style="min-width:70px;">${waitLabel}</span>
+        <span class="queue-actions" style="margin-left:auto;">
+          <button class="btn btn-danger" onclick="handleRemove('${item.id}', '${escapeAttr(item.name)}')">
+            Remove
+          </button>
+        </span>
+      </li>`;
+  });
+  html += '</ul>';
+  container.innerHTML = html;
+}
+
+// ── Handle "Serve Next" ───────────────────────────────────────
+async function handleNext() {
+  const btn     = document.getElementById("nextBtn");
+  const alertEl = document.getElementById("alert");
+
+  if (currentQueue.length === 0) {
+    showAlert(alertEl, "warning", "⚠️ Queue is empty — no one to serve.");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Processing…";
+
+  try {
+    const served = await serveNext();
+    if (served) {
+      servedCount++;
+      document.getElementById("statServed").textContent = servedCount;
+      showAlert(alertEl, "success",
+        `✅ Now serving Token #${String(served.tokenNumber).padStart(3,"0")} — ${served.name}`);
+    }
+  } catch (err) {
+    console.error("Serve error:", err);
+    showAlert(alertEl, "error", "Failed to serve next. Check console.");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = "▶ Serve Next";
+  }
+}
+
+// ── Handle "Remove" specific entry ───────────────────────────
+async function handleRemove(docId, name) {
+  const alertEl = document.getElementById("alert");
+  if (!confirm(`Remove "${name}" from the queue?`)) return;
+
+  try {
+    await removeFromQueue(docId);
+    showAlert(alertEl, "success", `🗑 Removed ${name} from queue.`);
+  } catch (err) {
+    console.error("Remove error:", err);
+    showAlert(alertEl, "error", "Failed to remove entry.");
+  }
+}
+
+// ── Clear entire queue ────────────────────────────────────────
+async function confirmClear() {
+  if (!confirm("⚠️ This will clear the ENTIRE queue. Are you sure?")) return;
+
+  const alertEl = document.getElementById("alert");
+  try {
+    // Delete all documents in batch
+    const snap  = await db.collection("queue").get();
+    const batch = db.batch();
+    snap.docs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+    showAlert(alertEl, "success", "🗑 Queue cleared successfully.");
+  } catch (err) {
+    console.error("Clear error:", err);
+    showAlert(alertEl, "error", "Failed to clear queue.");
+  }
+}
+
+// ── Sanitize helpers ─────────────────────────────────────────
+function escapeHtml(str) {
+  return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+function escapeAttr(str) {
+  return str.replace(/'/g,"&#39;").replace(/"/g,"&quot;");
+}
+
+// ── Init ──────────────────────────────────────────────────────
+window.addEventListener("DOMContentLoaded", () => {
+
+  // Listen to queue changes
+  listenToQueue(queue => renderQueue(queue));
+
+  // Listen to currently serving
+  listenToCurrentServing(data => {
+    if (data) {
+      document.getElementById("servingToken").textContent =
+        "#" + String(data.tokenNumber).padStart(3,"0");
+      document.getElementById("servingName").textContent  = data.name || "";
+    } else {
+      document.getElementById("servingToken").textContent = "—";
+      document.getElementById("servingName").textContent  = "None yet";
+    }
+  });
+});
+</script>
+</body>
+</html>

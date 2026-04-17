@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Queue Display — QueueFlow</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Extra display-page specific overrides */
+    .no-one {
+      font-family: var(--font-mono);
+      font-size: clamp(3rem, 10vw, 7rem);
+      color: var(--text-muted);
+      opacity: 0.4;
+    }
+
+    /* Token flip animation when it changes */
+    @keyframes tokenFlip {
+      0%   { opacity:0; transform: rotateX(90deg) scale(0.8); }
+      100% { opacity:1; transform: rotateX(0deg) scale(1); }
+    }
+
+    .flip { animation: tokenFlip 0.5s cubic-bezier(.34,1.56,.64,1) forwards; }
+
+    /* Ticker at bottom */
+    .ticker {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 0.65rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .ticker-time {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--amber);
+      margin-left: auto;
+    }
+  </style>
+</head>
+<body>
+
+<div class="display-page">
+
+  <!-- ── Page Header ── -->
+  <div class="display-header">
+    <h1>🎯 &nbsp; Queue Display Board</h1>
+  </div>
+
+  <!-- ── Now Serving ── -->
+  <div class="now-serving-card" id="nowServingCard">
+    <div class="now-serving-label">▶ NOW SERVING</div>
+    <div class="now-serving-token" id="nowToken">—</div>
+    <div class="now-serving-name" id="nowName"></div>
+  </div>
+
+  <!-- ── Up Next ── -->
+  <div class="up-next-section" id="upNextSection">
+    <div class="up-next-label">Up Next</div>
+    <!-- Dynamically filled -->
+    <div id="nextCards" style="display:flex;gap:1.5rem;flex-wrap:wrap;justify-content:center;"></div>
+  </div>
+
+  <!-- ── Footer Stats ── -->
+  <div class="display-footer">
+    <div>
+      <div class="display-stat-value" id="dispTotal">0</div>
+      <div class="display-stat-label">In Queue</div>
+    </div>
+    <div>
+      <div class="display-stat-value" id="dispAvgWait">—</div>
+      <div class="display-stat-label">Est. Wait (next)</div>
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;">
+        <span class="pulse-dot"></span>
+        <span style="font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--green);">Live</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /display-page -->
+
+<!-- ── Ticker Bar ── -->
+<div class="ticker">
+  <span>🎯 QueueFlow — Please have your token ready when your number is called.</span>
+  <span id="tickerTime" class="ticker-time"></span>
+</div>
+
+<!-- ── Firebase SDKs ── -->
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+<script type="module" src="script.js"></script>
+
+<script>
+// ── State ─────────────────────────────────────────────────────
+let lastServingToken = null;
+
+// ── Update "Now Serving" Section ─────────────────────────────
+function updateNowServing(data) {
+  const tokenEl = document.getElementById("nowToken");
+  const nameEl  = document.getElementById("nowName");
+
+  if (!data) {
+    tokenEl.textContent = "—";
+    nameEl.textContent  = "Waiting to start…";
+    return;
+  }
+
+  const display = "#" + String(data.tokenNumber).padStart(3, "0");
+
+  // Trigger flip animation only when token changes
+  if (data.tokenNumber !== lastServingToken) {
+    tokenEl.classList.remove("flip");
+    void tokenEl.offsetWidth; // reflow
+    tokenEl.classList.add("flip");
+    lastServingToken = data.tokenNumber;
+  }
+
+  tokenEl.textContent = display;
+  nameEl.textContent  = data.name || "";
+}
+
+// ── Render "Up Next" Cards ────────────────────────────────────
+function renderNextCards(queue) {
+  const container = document.getElementById("nextCards");
+  const upNextEl  = document.getElementById("upNextSection");
+
+  document.getElementById("dispTotal").textContent = queue.length;
+  document.getElementById("dispAvgWait").textContent =
+    queue.length > 0 ? estimateWait(1) : "—";
+
+  // Show up to 3 upcoming tokens
+  const upcoming = queue.slice(0, 3);
+
+  if (upcoming.length === 0) {
+    upNextEl.style.opacity = "0.3";
+    container.innerHTML = `<div class="next-card"><div class="next-token" style="color:var(--text-muted)">—</div></div>`;
+    return;
+  }
+
+  upNextEl.style.opacity = "1";
+  let html = "";
+  upcoming.forEach((item, i) => {
+    html += `
+      <div class="next-card">
+        <div class="next-token">#${String(item.tokenNumber).padStart(3,"0")}</div>
+        <div class="next-name">${escapeHtml(item.name)}</div>
+      </div>`;
+  });
+  container.innerHTML = html;
+}
+
+// ── Clock Ticker ──────────────────────────────────────────────
+function updateClock() {
+  document.getElementById("tickerTime").textContent =
+    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// ── Init ──────────────────────────────────────────────────────
+window.addEventListener("DOMContentLoaded", () => {
+
+  // Live queue listener
+  listenToQueue(queue => renderNextCards(queue));
+
+  // Live "now serving" listener
+  listenToCurrentServing(data => updateNowServing(data));
+
+  // Clock
+  updateClock();
+  setInterval(updateClock, 1000);
+});
+</script>
+</body>
+</html>
