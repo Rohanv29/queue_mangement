@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Join Queue — QueueFlow</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="page-wrapper">
+
+  <!-- ── Header ── -->
+  <header class="site-header">
+    <div class="logo">🎯</div>
+    <div>
+      <h1>QueueFlow</h1>
+      <p>Smart Queue System</p>
+    </div>
+    <nav class="nav-links">
+      <a href="admin.html">Admin</a>
+      <a href="display.html">Display</a>
+    </nav>
+  </header>
+
+  <!-- ── Alert Box ── -->
+  <div id="alert" class="alert" role="alert"></div>
+
+  <!-- ── Join Form ── -->
+  <div class="card" id="joinCard">
+    <p class="card-title">Join the Queue</p>
+    <div class="form-group">
+      <label for="nameInput">Your Full Name</label>
+      <input
+        type="text"
+        id="nameInput"
+        placeholder="e.g. Rohan Verma"
+        maxlength="50"
+        autocomplete="off"
+      />
+    </div>
+    <button class="btn btn-primary" id="joinBtn" onclick="handleJoin()">
+      <span>🎟️</span> Get Token
+    </button>
+  </div>
+
+  <!-- ── Token Card (hidden until joined) ── -->
+  <div id="tokenCard" style="display:none;">
+    <div class="token-display">
+      <div class="token-label">Your Token Number</div>
+      <div class="token-number" id="myToken" >_</div>
+      <div class="token-label" id="myName" style="margin-top:0.75rem;font-size:1rem;color:var(--text);"></div>
+    </div>
+
+    <!-- Stats row -->
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="stat-value" id="myPosition">—</div>
+        <div class="stat-label">Position</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="myWait">—</div>
+        <div class="stat-label">Est. Wait</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="totalQueue">—</div>
+        <div class="stat-label">In Queue</div>
+      </div>
+    </div>
+
+    <!-- Near-turn alert -->
+    <div id="nearAlert" class="alert alert-warning" style="display:none;">
+      ⚡ You're almost up! Please be ready.
+    </div>
+
+    <!-- Now serving info -->
+    <div class="card">
+      <p class="card-title">Now Serving</p>
+      <div style="display:flex; align-items:center; gap:1rem;">
+        <div style="font-family:var(--font-mono);font-size:2.5rem;font-weight:700;color:var(--amber)" id="servingToken">—</div>
+        <div>
+          <div id="servingName" style="font-size:1rem;font-weight:500;"></div>
+          <div style="font-size:0.78rem;color:var(--text-muted)">Currently at counter</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rejoin button -->
+    <button class="btn btn-outline" style="width:100%" onclick="resetView()">
+      ↩ Join Another Person
+    </button>
+  </div>
+
+  <!-- ── Live Queue Preview ── -->
+  <div class="card" id="queuePreviewCard" style="margin-top:0.5rem;">
+    <p class="card-title">Live Queue</p>
+    <div id="queuePreview">
+      <div class="loader">
+        <div class="loader-dots"><span></span><span></span><span></span></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /page-wrapper -->
+
+<!-- ── Firebase SDKs (v8 compat) ── -->
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+<script type="module" src="script.js"></script>
+
+<script>
+// ── Page State ───────────────────────────────────────────────
+let myJoinTime = null;
+let myTokenNumber   = null;   // The token assigned to the current user
+let unsubQueue      = null;   // Firestore listener unsubscribe fn
+let unsubServing    = null;   // Listener for currentServing
+function formatTime(timestamp) {
+  const date = new Date(timestamp);
+
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+
+  const formattedMinutes = minutes < 10 ? "0" + minutes : minutes;
+
+  return hours + ":" + formattedMinutes;
+}
+
+function showAlert(element, type, message) {
+  element.textContent = message;
+
+  element.style.display = "block";
+  element.style.padding = "10px";
+  element.style.margin = "10px 0";
+
+  if (type === "success") {
+    element.style.backgroundColor = "#d4edda";
+    element.style.color = "#155724";
+  } else if (type === "error") {
+    element.style.backgroundColor = "#f8d7da";
+    element.style.color = "#721c24";
+  } else {
+    element.style.backgroundColor = "#fff3cd";
+    element.style.color = "#856404";
+  }
+
+  // auto hide after 3 sec
+  setTimeout(() => {
+    element.style.display = "none";
+  }, 3000);
+}
+// ── Join Queue ───────────────────────────────────────────────
+async function handleJoin() {
+  const nameInput = document.getElementById("nameInput");
+  const name      = nameInput.value.trim();
+  const alertEl   = document.getElementById("alert");
+
+  if (!name) {
+    showAlert(alertEl, "error", "Please enter your name before joining.");
+    nameInput.focus();
+    return;
+  }
+
+  const btn = document.getElementById("joinBtn");
+  btn.disabled = true;
+  btn.textContent = "Joining…";
+
+  try {
+const token = await joinQueue(name);
+myTokenNumber = token;
+
+const data = await joinQueue(name);
+
+myTokenNumber = data.tokenNumber;
+myJoinTime = data.joinTime;
+
+document.getElementById("myToken").textContent =
+  String(data.tokenNumber).padStart(3, "0");
+    // Show token card, hide join form
+    document.getElementById("joinCard").style.display = "none";
+    document.getElementById("tokenCard").style.display = "block";
+    document.getElementById("myName").textContent  = name;
+
+    showAlert(alertEl, "success", `✅ Token #${String(token).padStart(3,"0")} assigned to ${name}!`);
+  } catch (err) {
+    console.error("Join error:", err);
+    showAlert(alertEl, "error", "Failed to join queue. Check your Firebase config.");
+    btn.disabled = false;
+    btn.innerHTML = "<span>🎟️</span> Get Token";
+  }
+}
+
+// ── Reset / New User ─────────────────────────────────────────
+function resetView() {
+  myTokenNumber = null;
+  document.getElementById("nameInput").value = "";
+  document.getElementById("joinCard").style.display  = "block";
+  document.getElementById("tokenCard").style.display = "none";
+  const btn = document.getElementById("joinBtn");
+  btn.disabled = false;
+  btn.innerHTML = "<span>🎟️</span> Get Token";
+  document.getElementById("nearAlert").style.display = "none";
+}
+
+function estimateWait(index){
+    console.log("wait calc:", index);
+
+    const timeperPerson = 2;
+    const waitTime = index * timeperPerson;
+
+    if(waitTime === 0) return "Now";
+    return waitTime + " Min";
+}
+// ── Update Stats for Current User ────────────────────────────
+function updateMyStats(queue) {
+  if (!myTokenNumber) return;
+
+const idx = queue.findIndex(q => q.timestamp === myJoinTime);
+  const total = queue.length;
+
+  document.getElementById("totalQueue").textContent = total;
+
+  if (idx === -1) {
+    document.getElementById("myPosition").textContent = "✓";
+    document.getElementById("myWait").textContent = "Done";
+    return;
+  }
+
+  const position = idx + 1;
+  document.getElementById("myPosition").textContent = position;
+  document.getElementById("myWait").textContent = estimateWait(idx);
+}
+    
+
+// ── Render Queue Preview ─────────────────────────────────────
+function renderQueuePreview(queue) {
+  const container = document.getElementById("queuePreview");
+
+  if (queue.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">🕐</div>
+        <p>Queue is empty — you'd be first!</p>
+      </div>`;
+    return;
+  }
+
+  // Show up to 5 entries
+  const visible = queue.slice(0, 5);
+  let html = '<ul class="queue-list">';
+  visible.forEach((item, i) => {
+    const isMe = item.tokenNumber === myTokenNumber;
+    html += `
+      <li class="queue-item${isMe ? " serving" : ""}">
+        <span class="queue-token">#${String(item.tokenNumber).padStart(3,"0")}</span>
+        <span class="queue-name">${escapeHtml(item.name)}${isMe ? " (you)" : ""}</span>
+        <span class="queue-meta">${formatTime(item.timestamp)}</span>
+        <span class="badge ${i === 0 ? "badge-serving" : "badge-waiting"}">
+          ${i === 0 ? "Next" : `#${i+1}`}
+        </span>
+      </li>`;
+  });
+  html += '</ul>';
+
+  if (queue.length > 5) {
+    html += `<p style="text-align:center;font-size:0.8rem;color:var(--text-muted);margin-top:0.75rem;">
+      +${queue.length - 5} more in queue</p>`;
+  }
+
+  container.innerHTML = html;
+}
+
+// ── Sanitize user-provided strings ───────────────────────────
+function escapeHtml(str) {
+  return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// ── Init: Subscribe to Live Updates ─────────────────────────
+window.addEventListener("DOMContentLoaded", () => {
+  // Listen to queue
+  unsubQueue = listenToQueue(queue => {
+  console.log("QUEUE:", queue);              // 👈 debug
+  console.log("myToken:", myTokenNumber);    // 👈 debug
+
+  renderQueuePreview(queue);
+  updateMyStats(queue);
+
+  if (!myTokenNumber) {
+    document.getElementById("totalQueue") &&
+      (document.getElementById("totalQueue").textContent = queue.length);
+  }
+});
+
+  // Listen to currently serving
+  unsubServing = listenToCurrentServing(data => {
+    if (data) {
+      document.getElementById("servingToken").textContent =
+        "#" + String(data.tokenNumber).padStart(3,"0");
+      document.getElementById("servingName").textContent = data.name || "";
+    } else {
+      document.getElementById("servingToken").textContent = "—";
+      document.getElementById("servingName").textContent  = "No one yet";
+    }
+  });
+});
+
+// ── Allow Enter key to submit ─────────────────────────────────
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && document.getElementById("joinCard").style.display !== "none") {
+    handleJoin();
+  }
+});
+</script>
+</body>
+</html>
