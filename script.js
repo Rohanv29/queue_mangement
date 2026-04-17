@@ -54,19 +54,27 @@ window.listenToQueue = function (callback) {
 
 // ✅ ADD USER
 window.joinQueue = async function (name) {
+  const user = auth.currentUser;
+
+  if (!user) {
+    alert("Login required");
+    return;
+  }
+
+  const now = Date.now();
+
   const snapshot = await getDocs(query(queueRef, orderBy("time")));
-  
-  const token = snapshot.size + 1; 
-const now = Date.now();
+  const token = snapshot.size + 1;
 
-await addDoc(queueRef, {
-  name: name,
-  time: now
-});
+  await addDoc(queueRef, {
+    name: name,
+    time: now,
+    userId: user.uid
+  });
 
- return {
+  return {
     tokenNumber: token,
-    joinTime: now     
+    joinTime: now
   };
 };
 

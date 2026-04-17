@@ -1,23 +1,45 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
   <title>Signup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
 
-<h2>Create Account</h2>
+<body class="bg-gray-900 flex items-center justify-center h-screen">
 
-<input type="email" id="signup-email" placeholder="Enter email">
-<br><br>
+  <div class="bg-white p-8 rounded-2xl shadow-lg w-184 h-90 ">
+    
+    <h2 class="text-2xl font-bold text-center mb-6">Create Account</h2>
 
-<input type="password" id="signup-password" placeholder="Enter password">
-<br><br>
+    <input 
+      type="email" 
+      id="signup-email"
+      placeholder="Email"
+      class="w-full mb-4 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+    >
 
-<button id="signupBtn" type="button">Signup</button>
+    <input 
+      type="password" 
+      id="signup-password"
+      placeholder="Password"
+      class="w-full mb-4 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+    >
 
-<p>Already have account? <a href="index.html">Login</a></p>
+    <button 
+      id="signupBtn"
+      class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition"
+    >
+      Signup
+    </button>
 
-<script type="module" src="auth.js"></script>
+    <p class="text-sm text-center mt-4">
+      Already have an account?
+      <a href="index.html" class="text-blue-500 hover:underline">Login</a>
+    </p>
 
+  </div>
+
+  <script type="module" src="auth.js"></script>
 </body>
 </html>

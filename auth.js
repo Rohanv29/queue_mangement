@@ -32,13 +32,14 @@ async function signup() {
 async function login() {
   const email = document.getElementById("login-email").value;
   const password = document.getElementById("login-password").value;
+  const errorMsg = document.getElementById("errorMsg");
 
   try {
     await signInWithEmailAndPassword(auth, email, password);
-    alert("Login successful");
     window.location.href = "home.html";
   } catch (err) {
-    alert(err.message);
+    errorMsg.textContent = err.message;
+    errorMsg.classList.remove("hidden");
   }
 }
 
@@ -47,8 +48,6 @@ window.logout = async function () {
   await signOut(auth);
   window.location.href = "index.html";
 };
-
-// 🔐 PROTECT PAGES
 onAuthStateChanged(auth, (user) => {
   const protectedPages = ["home.html", "admin.html", "display.html"];
   const currentPage = window.location.pathname.split("/").pop();
@@ -57,6 +56,8 @@ onAuthStateChanged(auth, (user) => {
     window.location.href = "index.html";
   }
 });
+// 🔐 PROTECT PAGES
+
 
 // ✅ EVENT LISTENERS (BOTTOM ME — IMPORTANT)
 document.getElementById("signupBtn")?.addEventListener("click", signup);
