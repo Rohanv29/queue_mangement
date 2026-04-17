@@ -1,4 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
   getFirestore,
   collection,
@@ -10,19 +11,25 @@ import {
   doc,
   getDocs
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import firebaseConfig from "./firebase.js";
 
-// 🔴 PASTE YOUR CONFIG HERE
-const firebaseConfig = {
-  apiKey: "YOUR_KEY",
-  authDomain: "YOUR_DOMAIN",
-  projectId: "YOUR_ID",
-};
+
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 const queueRef = collection(db, "queue");
+function formatTime(timestamp) {
+  const date = new Date(timestamp);
 
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+
+  const formattedMinutes = minutes < 10 ? "0" + minutes : minutes;
+
+  return hours + ":" + formattedMinutes;
+}
 // ✅ LISTEN QUEUE
 window.listenToQueue = function (callback) {
   const q = query(queueRef, orderBy("time"));
@@ -47,10 +54,20 @@ window.listenToQueue = function (callback) {
 
 // ✅ ADD USER
 window.joinQueue = async function (name) {
-  await addDoc(queueRef, {
-    name: name,
-    time: Date.now()
-  });
+  const snapshot = await getDocs(query(queueRef, orderBy("time")));
+  
+  const token = snapshot.size + 1; 
+const now = Date.now();
+
+await addDoc(queueRef, {
+  name: name,
+  time: now
+});
+
+ return {
+    tokenNumber: token,
+    joinTime: now     
+  };
 };
 
 // ✅ SERVE NEXT
