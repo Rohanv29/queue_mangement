@@ -90,22 +90,36 @@ window.logout = async function () {
 };
 
 
-// ================= ADMIN PROTECTION ONLY =================
+// ================= ADMIN PROTECTION (FIXED) =================
 function protectAdminPage() {
   const currentPage = window.location.pathname.split("/").pop();
 
   if (currentPage !== "admin.html") return;
 
+  let checked = false; // 🔥 prevents multiple runs
+
   onAuthStateChanged(auth, async (user) => {
+    if (checked) return;
+    checked = true;
+
     if (!user) {
-      window.location.href = "index.html";
+      window.location.replace("index.html");
       return;
     }
 
-    const snap = await getDoc(doc(db, "users", user.uid));
+    try {
+      const snap = await getDoc(doc(db, "users", user.uid));
 
-    if (!snap.exists() || snap.data().role !== "admin") {
-      window.location.href = "home.html";
+      if (!snap.exists() || snap.data().role !== "admin") {
+        window.location.replace("home.html");
+      } else {
+        // ✅ show page only after verification
+        document.body.style.display = "block";
+      }
+
+    } catch (err) {
+      console.error(err);
+      window.location.replace("index.html");
     }
   });
 }
