@@ -6,59 +6,139 @@ import {
   signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  getDoc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
 import firebaseConfig from "./firebase.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getFirestore(app);
 
-// SIGNUP FUNCTION
+
+// ================= SIGNUP =================
 async function signup() {
-  console.log("Signup clicked");
+  const email = document.getElementById("signup-email")?.value;
+  const password = document.getElementById("signup-password")?.value;
 
-  const email = document.getElementById("signup-email").value;
-  const password = document.getElementById("signup-password").value;
+  if (!email || !password) {
+    alert("Fill all fields");
+    return;
+  }
 
   try {
-    await createUserWithEmailAndPassword(auth, email, password);
+    const userCred = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCred.user;
+
+    await setDoc(doc(db, "users", user.uid), {
+      email: email,
+      role: "user"
+    });
+
     alert("Signup successful");
-    window.location.href = "index.html";
+    window.location.replace("index.html");
   } catch (err) {
-    console.log(err);
     alert(err.message);
   }
 }
 
-// LOGIN FUNCTION
+
+// ================= LOGIN =================
 async function login() {
-  const email = document.getElementById("login-email").value;
-  const password = document.getElementById("login-password").value;
-  const errorMsg = document.getElementById("errorMsg");
+  const email = document.getElementById("login-email")?.value;
+  const password = document.getElementById("login-password")?.value;
+
+  if (!email || !password) {
+    alert("Enter email & password");
+    return;
+  }
 
   try {
-    await signInWithEmailAndPassword(auth, email, password);
-    window.location.href = "home.html";
+    const userCred = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCred.user;
+
+    const docRef = doc(db, "users", user.uid);
+    const snap = await getDoc(docRef);
+
+    if (!snap.exists()) {
+      alert("No role found");
+      return;
+    }
+
+    const role = snap.data().role;
+
+    console.log("ROLE:", role);
+
+    if (role === "admin") {
+      window.location.replace("admin.html");
+    } else {
+      window.location.replace("home.html");
+    }
+
   } catch (err) {
-    errorMsg.textContent = err.message;
-    errorMsg.classList.remove("hidden");
+    alert(err.message);
   }
 }
 
-// LOGOUT
+
+// ================= LOGOUT =================
 window.logout = async function () {
   await signOut(auth);
-  window.location.href = "index.html";
+  window.location.replace("index.html");
 };
-onAuthStateChanged(auth, (user) => {
-  const protectedPages = ["home.html", "admin.html", "display.html"];
+
+
+// ================= GLOBAL AUTH CONTROL =================
+function handleRouting(user) {
   const currentPage = window.location.pathname.split("/").pop();
 
-  if (protectedPages.includes(currentPage) && !user) {
-    window.location.href = "index.html";
+  // Not logged in
+  if (!user) {
+    if (currentPage !== "index.html" && currentPage !== "signup.html") {
+      window.location.replace("index.html");
+    }
+    return;
   }
+
+  // Logged in → check role
+  (async () => {
+    const docRef = doc(db, "users", user.uid);
+    const snap = await getDoc(docRef);
+
+    if (!snap.exists()) return;
+
+    const role = snap.data().role;
+
+    console.log("AUTH ROLE:", role);
+
+    // Admin routing
+    if (role === "admin") {
+      if (currentPage !== "admin.html") {
+        window.location.replace("admin.html");
+      }
+    }
+
+    // User routing
+    if (role === "user") {
+      if (currentPage === "admin.html") {
+        window.location.replace("home.html");
+      }
+    }
+  })();
+}
+
+
+// ================= AUTH LISTENER =================
+onAuthStateChanged(auth, (user) => {
+  handleRouting(user);
 });
-// 🔐 PROTECT PAGES
 
 
-// ✅ EVENT LISTENERS (BOTTOM ME — IMPORTANT)
+// ================= EVENT LISTENERS =================
 document.getElementById("signupBtn")?.addEventListener("click", signup);
 document.getElementById("loginBtn")?.addEventListener("click", login);
