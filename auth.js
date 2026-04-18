@@ -20,6 +20,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+
 // ================= SIGNUP =================
 async function signup() {
   const email = document.getElementById("signup-email")?.value;
@@ -40,11 +41,12 @@ async function signup() {
     });
 
     alert("Signup successful");
-    window.location.replace("index.html");
+    window.location.href = "index.html";
   } catch (err) {
     alert(err.message);
   }
 }
+
 
 // ================= LOGIN =================
 async function login() {
@@ -60,8 +62,7 @@ async function login() {
     const userCred = await signInWithEmailAndPassword(auth, email, password);
     const user = userCred.user;
 
-    const docRef = doc(db, "users", user.uid);
-    const snap = await getDoc(docRef);
+    const snap = await getDoc(doc(db, "users", user.uid));
 
     if (!snap.exists()) {
       alert("No role found");
@@ -70,12 +71,10 @@ async function login() {
 
     const role = snap.data().role;
 
-    console.log("ROLE:", role);
-
     if (role === "admin") {
-      window.location.replace("admin.html");
+      window.location.href = "admin.html";
     } else {
-      window.location.replace("home.html");
+      window.location.href = "home.html";
     }
 
   } catch (err) {
@@ -83,96 +82,39 @@ async function login() {
   }
 }
 
+
 // ================= LOGOUT =================
 window.logout = async function () {
   await signOut(auth);
-  window.location.replace("index.html");
+  window.location.href = "index.html";
 };
 
-// ================= GLOBAL AUTH CONTROL =================
-function handleRouting(user) {
+
+// ================= ADMIN PROTECTION ONLY =================
+function protectAdminPage() {
   const currentPage = window.location.pathname.split("/").pop();
 
-  // ✅ Allow these pages without redirect
-  const publicPages = ["index.html", "signup.html"];
+  if (currentPage !== "admin.html") return;
 
-  // 🔓 Not logged in
-  if (!user) {
-    if (!publicPages.includes(currentPage)) {
-      window.location.replace("index.html");
-    }
-    return;
-  }
-
-  // 🔐 Logged in → check role
-  (async () => {
-    const docRef = doc(db, "users", user.uid);
-    const snap = await getDoc(docRef);
-
-    if (!snap.exists()) return;
-
-    const role = snap.data().role;
-
-    console.log("AUTH ROLE:", role);
-
-    // ✅ Don't redirect if already on login/signup
-    if (publicPages.includes(currentPage)) return;
-
-    // 👑 Admin routing
-    if (role === "admin" && currentPage !== "admin.html") {
-      window.location.replace("admin.html");
-    }
-
-    // 👤 User routing
-    if (role === "user" && currentPage === "admin.html") {
-      window.location.replace("home.html");
-    }
-
-  })();
-}
-
-// ================= AUTH LISTENER =================
-let isAuthChecked = false;
-
-onAuthStateChanged(auth, async (user) => {
-  if (isAuthChecked) return; // 🚫 prevent multiple runs
-  isAuthChecked = true;
-
-  const currentPage = window.location.pathname.split("/").pop();
-  const publicPages = ["index.html", "signup.html"];
-
-  // ⏳ Wait a bit to stabilize UI
-  setTimeout(async () => {
-
+  onAuthStateChanged(auth, async (user) => {
     if (!user) {
-      if (!publicPages.includes(currentPage)) {
-        window.location.replace("index.html");
-      }
+      window.location.href = "index.html";
       return;
     }
 
-    const docRef = doc(db, "users", user.uid);
-    const snap = await getDoc(docRef);
+    const snap = await getDoc(doc(db, "users", user.uid));
 
-    if (!snap.exists()) return;
-
-    const role = snap.data().role;
-
-    console.log("AUTH ROLE:", role);
-
-    if (publicPages.includes(currentPage)) return;
-
-    if (role === "admin" && currentPage !== "admin.html") {
-      window.location.replace("admin.html");
+    if (!snap.exists() || snap.data().role !== "admin") {
+      window.location.href = "home.html";
     }
+  });
+}
 
-    if (role === "user" && currentPage === "admin.html") {
-      window.location.replace("home.html");
-    }
 
-  }, 200); // small delay to stop flicker
-});
+// ================= INIT =================
+protectAdminPage();
 
-// ================= EVENT LISTENERS =================
+
+// ================= EVENTS =================
 document.getElementById("signupBtn")?.addEventListener("click", signup);
 document.getElementById("loginBtn")?.addEventListener("click", login);
