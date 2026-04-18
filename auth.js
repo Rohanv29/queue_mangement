@@ -20,7 +20,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-
 // ================= SIGNUP =================
 async function signup() {
   const email = document.getElementById("signup-email")?.value;
@@ -46,7 +45,6 @@ async function signup() {
     alert(err.message);
   }
 }
-
 
 // ================= LOGIN =================
 async function login() {
@@ -85,27 +83,28 @@ async function login() {
   }
 }
 
-
 // ================= LOGOUT =================
 window.logout = async function () {
   await signOut(auth);
   window.location.replace("index.html");
 };
 
-
 // ================= GLOBAL AUTH CONTROL =================
 function handleRouting(user) {
   const currentPage = window.location.pathname.split("/").pop();
 
-  // Not logged in
+  // ✅ Allow these pages without redirect
+  const publicPages = ["index.html", "signup.html"];
+
+  // 🔓 Not logged in
   if (!user) {
-    if (currentPage !== "index.html" && currentPage !== "signup.html") {
+    if (!publicPages.includes(currentPage)) {
       window.location.replace("index.html");
     }
     return;
   }
 
-  // Logged in → check role
+  // 🔐 Logged in → check role
   (async () => {
     const docRef = doc(db, "users", user.uid);
     const snap = await getDoc(docRef);
@@ -116,28 +115,26 @@ function handleRouting(user) {
 
     console.log("AUTH ROLE:", role);
 
-    // Admin routing
-    if (role === "admin") {
-      if (currentPage !== "admin.html") {
-        window.location.replace("admin.html");
-      }
+    // ✅ Don't redirect if already on login/signup
+    if (publicPages.includes(currentPage)) return;
+
+    // 👑 Admin routing
+    if (role === "admin" && currentPage !== "admin.html") {
+      window.location.replace("admin.html");
     }
 
-    // User routing
-    if (role === "user") {
-      if (currentPage === "admin.html") {
-        window.location.replace("home.html");
-      }
+    // 👤 User routing
+    if (role === "user" && currentPage === "admin.html") {
+      window.location.replace("home.html");
     }
+
   })();
 }
-
 
 // ================= AUTH LISTENER =================
 onAuthStateChanged(auth, (user) => {
   handleRouting(user);
 });
-
 
 // ================= EVENT LISTENERS =================
 document.getElementById("signupBtn")?.addEventListener("click", signup);
