@@ -132,8 +132,45 @@ function handleRouting(user) {
 }
 
 // ================= AUTH LISTENER =================
-onAuthStateChanged(auth, (user) => {
-  handleRouting(user);
+let isAuthChecked = false;
+
+onAuthStateChanged(auth, async (user) => {
+  if (isAuthChecked) return; // 🚫 prevent multiple runs
+  isAuthChecked = true;
+
+  const currentPage = window.location.pathname.split("/").pop();
+  const publicPages = ["index.html", "signup.html"];
+
+  // ⏳ Wait a bit to stabilize UI
+  setTimeout(async () => {
+
+    if (!user) {
+      if (!publicPages.includes(currentPage)) {
+        window.location.replace("index.html");
+      }
+      return;
+    }
+
+    const docRef = doc(db, "users", user.uid);
+    const snap = await getDoc(docRef);
+
+    if (!snap.exists()) return;
+
+    const role = snap.data().role;
+
+    console.log("AUTH ROLE:", role);
+
+    if (publicPages.includes(currentPage)) return;
+
+    if (role === "admin" && currentPage !== "admin.html") {
+      window.location.replace("admin.html");
+    }
+
+    if (role === "user" && currentPage === "admin.html") {
+      window.location.replace("home.html");
+    }
+
+  }, 200); // small delay to stop flicker
 });
 
 // ================= EVENT LISTENERS =================
