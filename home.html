@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Join Queue — QueueFlow</title>
+  <title>Join -QueueFlow</title>
   <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
 
@@ -17,6 +18,10 @@
       <h1>QueueFlow</h1>
       <p>Smart Queue System</p>
     </div>
+  <button onclick="logout()"
+  class="ml-2 bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600 transition">
+  Logout
+</button>
     <nav class="nav-links">
       <a href="admin.html">Admin</a>
       <a href="display.html">Display</a>
@@ -106,6 +111,7 @@
 <!-- ── Firebase SDKs (v8 compat) ── -->
 <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+<script type="module" src="auth.js"></script>
 <script type="module" src="script.js"></script>
 
 <script>
@@ -182,11 +188,13 @@ document.getElementById("myToken").textContent =
 
     showAlert(alertEl, "success", `✅ Token #${String(token).padStart(3,"0")} assigned to ${name}!`);
   } catch (err) {
-    console.error("Join error:", err);
-    showAlert(alertEl, "error", "Failed to join queue. Check your Firebase config.");
-    btn.disabled = false;
-    btn.innerHTML = "<span>🎟️</span> Get Token";
-  }
+  console.error("REAL ERROR:", err); // 👈 IMPORTANT
+
+  showAlert(alertEl, "error", err.message);
+
+  btn.disabled = false;
+  btn.innerHTML = "<span>🎟️</span> Get Token";
+}
 }
 
 // ── Reset / New User ─────────────────────────────────────────

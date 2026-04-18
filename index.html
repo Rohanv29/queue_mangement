@@ -1,20 +1,53 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
   <title>Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
 
-<h2>Login</h2>
+<body class="bg-gray-900 flex items-center justify-center h-screen">
 
-<input type="email" id="login-email" placeholder="Email">
-<input type="password" id="login-password" placeholder="Password">
+  <div class="bg-white p-8 rounded-2xl shadow-lg w-180 h-90">
+    
+    <h2 class="text-2xl font-bold text-center mb-6">Login</h2>
 
-<button id="loginBtn" type="button">Login</button>
+    <!-- Email -->
+    <input 
+      type="email" 
+      id="login-email"
+      placeholder="Email"
+      class="w-full mb-4 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+    >
 
-<p>No account? <a href="signup.html">Signup</a></p>
+    <!-- Password -->
+    <input 
+      type="password" 
+      id="login-password"
+      placeholder="Password"
+      class="w-full mb-4 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+    >
 
-<script type="module" src="auth.js"></script>
+    <!-- Login Button -->
+    <button 
+      id="loginBtn"
+      class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition"
+    >
+      Login
+    </button>
+
+    <!-- Error Message -->
+    <p id="errorMsg" class="text-red-500 text-sm mt-3 text-center hidden"></p>
+
+    <!-- Signup link -->
+    <p class="text-sm text-center mt-4">
+      Don't have an account?
+      <a href="signup.html" class="text-blue-500 hover:underline">Signup</a>
+    </p>
+
+  </div>
+
+  <script type="module" src="auth.js"></script>
 
 </body>
 </html>
